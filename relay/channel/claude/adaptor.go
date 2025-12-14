@@ -74,8 +74,30 @@ func CommonClaudeHeadersOperation(c *gin.Context, req *http.Header, info *relayc
 	model_setting.GetClaudeSettings().WriteHeaders(info.OriginModelName, req)
 }
 
+// shouldExcludeApiKey 检查URL是否包含任何排除域名
+func shouldExcludeApiKey(baseURL string) bool {
+	excludeDomains := []string{"gaccode.com"}
+	for _, domain := range excludeDomains {
+		if strings.Contains(baseURL, domain) {
+			return true
+		}
+	}
+	return false
+}
+
 func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Header, info *relaycommon.RelayInfo) error {
+
 	channel.SetupApiRequestHeader(info, c, req)
+
+	excluded := shouldExcludeApiKey(info.ChannelBaseUrl)
+	if excluded {
+		// req.Set("x-api-key", info.ApiKey)
+		req.Set("Authorization", "Bearer "+info.ApiKey)
+		fmt.Printf("[Claude Adaptor] Setting x-api-key for URL: %s\n", info.ChannelBaseUrl)
+	} else {
+		fmt.Printf("[Claude Adaptor] Excluding x-api-key for URL: %s (matched exclude list)\n", info.ChannelBaseUrl)
+	}
+
 	req.Set("x-api-key", info.ApiKey)
 	anthropicVersion := c.Request.Header.Get("anthropic-version")
 	if anthropicVersion == "" {

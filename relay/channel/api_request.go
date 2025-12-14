@@ -59,6 +59,54 @@ func processHeaderOverride(info *common.RelayInfo) (map[string]string, error) {
 }
 
 func DoApiRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody io.Reader) (*http.Response, error) {
+		// 打印原始请求来源的详细信息
+	common2.SysLog("========== DoApiRequest Original Client Request ==========")
+	common2.SysLog(fmt.Sprintf("Client Method: %s", c.Request.Method))
+	common2.SysLog(fmt.Sprintf("Client URL: %s", c.Request.URL.String()))
+	common2.SysLog(fmt.Sprintf("Client Host: %s", c.Request.Host))
+	common2.SysLog(fmt.Sprintf("Client RemoteAddr: %s", c.Request.RemoteAddr))
+	common2.SysLog(fmt.Sprintf("Client Proto: %s", c.Request.Proto))
+
+	// 打印原始请求头
+	common2.SysLog("---------- Original Client Headers ----------")
+	for key, values := range c.Request.Header {
+		for _, value := range values {
+			common2.SysLog(fmt.Sprintf("  %s: %s", key, value))
+		}
+	}
+
+	// 打印原始URL参数
+	if len(c.Request.URL.RawQuery) > 0 {
+		common2.SysLog("---------- Original Query Parameters ----------")
+		common2.SysLog(fmt.Sprintf("  RawQuery: %s", c.Request.URL.RawQuery))
+	}
+
+	// 打印RelayInfo信息（转发前）
+	common2.SysLog("---------- RelayInfo (Before Forward) ----------")
+	common2.SysLog(fmt.Sprintf("  UserId: %d", info.UserId))
+	common2.SysLog(fmt.Sprintf("  UsingGroup: %s", info.UsingGroup))
+	common2.SysLog(fmt.Sprintf("  UserGroup: %s", info.UserGroup))
+	common2.SysLog(fmt.Sprintf("  TokenId: %d", info.TokenId))
+	common2.SysLog(fmt.Sprintf("  TokenKey: %s", info.TokenKey))
+	common2.SysLog(fmt.Sprintf("  OriginModelName: %s", info.OriginModelName))
+	common2.SysLog(fmt.Sprintf("  RelayMode: %d", info.RelayMode))
+	common2.SysLog(fmt.Sprintf("  IsStream: %t", info.IsStream))
+	if info.ChannelMeta != nil {
+		common2.SysLog("  ChannelMeta:")
+		common2.SysLog(fmt.Sprintf("    ChannelId: %d", info.ChannelMeta.ChannelId))
+		common2.SysLog(fmt.Sprintf("    ChannelType: %d", info.ChannelMeta.ChannelType))
+		common2.SysLog(fmt.Sprintf("    ChannelBaseUrl: %s", info.ChannelMeta.ChannelBaseUrl))
+		common2.SysLog(fmt.Sprintf("    ApiVersion: %s", info.ChannelMeta.ApiVersion))
+		common2.SysLog(fmt.Sprintf("    UpstreamModelName: %s", info.ChannelMeta.UpstreamModelName))
+		if len(info.ChannelMeta.HeadersOverride) > 0 {
+			common2.SysLog("    HeadersOverride:")
+			for k, v := range info.ChannelMeta.HeadersOverride {
+				common2.SysLog(fmt.Sprintf("      %s: %v", k, v))
+			}
+		}
+	}
+	common2.SysLog("==========================================================")
+
 	fullRequestURL, err := a.GetRequestURL(info)
 	if err != nil {
 		return nil, fmt.Errorf("get request url failed: %w", err)
@@ -115,6 +163,26 @@ func DoFormRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBod
 	if err != nil {
 		return nil, fmt.Errorf("setup request header failed: %w", err)
 	}
+
+		// 打印准备发送到上游API的最终请求头
+	common2.SysLog("========== Final Request Headers Before Sending ==========")
+	common2.SysLog(fmt.Sprintf("Target URL: %s", fullRequestURL))
+	common2.SysLog("---------- All Headers ----------")
+	for key, values := range req.Header {
+		for _, value := range values {
+			// 对敏感信息进行部分隐藏
+			displayValue := value
+			lowerKey := strings.ToLower(key)
+			if lowerKey == "authorization" || lowerKey == "api-key" {
+				if len(value) > 10 {
+					displayValue = value[:10] + "..." + value[len(value)-4:]
+				}
+			}
+			common2.SysLog(fmt.Sprintf("  %s: %s", key, displayValue))
+		}
+	}
+	common2.SysLog("==========================================================")
+
 	resp, err := doRequest(c, req, info)
 	if err != nil {
 		return nil, fmt.Errorf("do request failed: %w", err)
@@ -253,6 +321,58 @@ func DoRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 	return doRequest(c, req, info)
 }
 func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http.Response, error) {
+
+	// 打印转发到上游API的详细信息
+	common2.SysLog("========== doRequest Upstream Request Details ==========")
+	common2.SysLog(fmt.Sprintf("Method: %s", req.Method))
+	common2.SysLog(fmt.Sprintf("URL: %s", req.URL.String()))
+	common2.SysLog(fmt.Sprintf("Proto: %s", req.Proto))
+	common2.SysLog(fmt.Sprintf("Host: %s", req.Host))
+
+	// 打印请求头
+	common2.SysLog("---------- Request Headers ----------")
+	for key, values := range req.Header {
+		for _, value := range values {
+			common2.SysLog(fmt.Sprintf("  %s: %s", key, value))
+		}
+	}
+
+	// 打印URL参数
+	if len(req.URL.RawQuery) > 0 {
+		common2.SysLog("---------- URL Query Parameters ----------")
+		common2.SysLog(fmt.Sprintf("  RawQuery: %s", req.URL.RawQuery))
+		for key, values := range req.URL.Query() {
+			for _, value := range values {
+				common2.SysLog(fmt.Sprintf("  %s: %s", key, value))
+			}
+		}
+	}
+
+	// 打印RelayInfo关键信息
+	common2.SysLog("---------- RelayInfo Details ----------")
+	common2.SysLog(fmt.Sprintf("  UserId: %d", info.UserId))
+	common2.SysLog(fmt.Sprintf("  UsingGroup: %s", info.UsingGroup))
+	common2.SysLog(fmt.Sprintf("  TokenId: %d", info.TokenId))
+	common2.SysLog(fmt.Sprintf("  RelayMode: %d", info.RelayMode))
+	common2.SysLog(fmt.Sprintf("  IsStream: %t", info.IsStream))
+	common2.SysLog(fmt.Sprintf("  OriginModel: %s", info.OriginModelName))
+	if info.ChannelMeta != nil {
+		common2.SysLog(fmt.Sprintf("  ChannelId: %d", info.ChannelMeta.ChannelId))
+		common2.SysLog(fmt.Sprintf("  ChannelType: %d", info.ChannelMeta.ChannelType))
+		common2.SysLog(fmt.Sprintf("  UpstreamModel: %s", info.ChannelMeta.UpstreamModelName))
+		if info.ChannelMeta.ChannelSetting.Proxy != "" {
+			common2.SysLog(fmt.Sprintf("  Proxy: %s", info.ChannelMeta.ChannelSetting.Proxy))
+		}
+	}
+
+	// 打印请求体长度（如果可获取）
+	if req.ContentLength > 0 {
+		common2.SysLog("---------- Request Body ----------")
+		common2.SysLog(fmt.Sprintf("  ContentLength: %d bytes", req.ContentLength))
+	}
+
+	common2.SysLog("========================================================")
+	
 	var client *http.Client
 	var err error
 	if info.ChannelSetting.Proxy != "" {
