@@ -9,6 +9,10 @@ build-frontend:
 	@echo "Building frontend..."
 	@cd $(FRONTEND_DIR) && bun install && DISABLE_ESLINT_PLUGIN='true' VITE_REACT_APP_VERSION=$(cat VERSION) bun run build
 
+build-backend:
+	@echo "Building backend..."
+	go build -ldflags "-s -w -X 'github.com/QuantumNous/new-api/common.Version=$(cat VERSION)'" -o new-api
+
 start-backend:
 	@echo "Starting backend dev server..."
 	@cd $(BACKEND_DIR) && go run main.go &
