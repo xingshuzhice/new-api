@@ -195,7 +195,7 @@ const FooterBar = () => {
             </Typography.Text>
           </div>
 
-          <div className='text-sm'>
+          {/* <div className='text-sm'>
             <span className='!text-semi-color-text-1'>
               {t('设计与开发由')}{' '}
             </span>
@@ -207,7 +207,7 @@ const FooterBar = () => {
             >
               New API
             </a>
-          </div>
+          </div> */}
         </div>
       </footer>
     ),
@@ -228,7 +228,7 @@ const FooterBar = () => {
               dangerouslySetInnerHTML={{ __html: footer }}
             ></div>
             <div className='text-sm flex-shrink-0'>
-              <span className='!text-semi-color-text-1'>
+              {/* <span className='!text-semi-color-text-1'>
                 {t('设计与开发由')}{' '}
               </span>
               <a
@@ -238,7 +238,7 @@ const FooterBar = () => {
                 className='!text-semi-color-primary font-medium'
               >
                 New API
-              </a>
+              </a> */}
             </div>
           </div>
         </footer>

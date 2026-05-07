@@ -61,7 +61,7 @@ function ProjectAttribution(props: { currentYear: number }) {
 
   return (
     <div className='text-muted-foreground/45 text-center text-xs sm:text-right'>
-      <span className='text-muted-foreground/45'>
+      {/* <span className='text-muted-foreground/45'>
         &copy; {props.currentYear}{' '}
         <a
           href='https://github.com/QuantumNous/new-api'
@@ -72,7 +72,7 @@ function ProjectAttribution(props: { currentYear: number }) {
           {t('New API')}
         </a>
         . {t(NEW_API_FOOTER_ATTRIBUTION_KEY)}
-      </span>
+      </span> */}
     </div>
   )
 }

@@ -20,6 +20,10 @@ build-backend:
 	@echo "Building backend..."
 	go build -ldflags "-s -w -X 'github.com/QuantumNous/new-api/common.Version=$(cat VERSION)'" -o new-api
 
+build-backend-linux: 
+	@echo "Building backend for Linux..."
+	@cd $(BACKEND_DIR) && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-s -w -X 'github.com/QuantumNous/new-api/common.Version=$(VERSION_VALUE)'" -o new-api-linux-amd64
+
 start-backend:
 	@echo "Starting backend dev server..."
 	@cd $(BACKEND_DIR) && go run main.go &
