@@ -52,4 +52,5 @@ publish-frontend: build-all-frontends
 ## 部署发布后端
 publish-backend: build-all-frontends build-backend-linux
 	@echo "Publishing backend to server..."
-	@rsync -avzurP new-api-linux-amd64 38.76.162.78-heyunidc:~/code/new-api/new-api
+# 	@rsync -avzurP new-api-linux-amd64 38.76.162.78-heyunidc:~/code/new-api/new-api
+	@rsync -avzurP new-api-linux-amd64 dogyun:~/code/new-api/new-api
