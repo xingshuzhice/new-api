@@ -41,3 +41,15 @@ dev-web-classic:
 	@cd $(FRONTEND_CLASSIC_DIR) && bun install && bun run dev
 
 dev: dev-api dev-web
+
+
+## 部署发布前端
+publish-frontend: build-all-frontends
+	@echo "Publishing frontend to server..."
+	@rsync -avz --delete $(FRONTEND_DIR)/dist/ 38.76.162.78-heyunidc:~/code/new-api/$(FRONTEND_DIR)/dist/
+	@rsync -avz --delete $(FRONTEND_CLASSIC_DIR)/dist/ 38.76.162.78-heyunidc:~/code/new-api/$(FRONTEND_CLASSIC_DIR)/dist/
+
+## 部署发布后端
+publish-backend: build-all-frontends build-backend-linux
+	@echo "Publishing backend to server..."
+	@rsync -avzurP new-api-linux-amd64 38.76.162.78-heyunidc:~/code/new-api/new-api

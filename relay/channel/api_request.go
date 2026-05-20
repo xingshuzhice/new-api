@@ -483,6 +483,103 @@ func sendPingData(c *gin.Context, mutex *sync.Mutex) error {
 func DoRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http.Response, error) {
 	return doRequest(c, req, info)
 }
+
+func buildStreamRequestLogDetails(c *gin.Context, req *http.Request, info *common.RelayInfo) string {
+	requestPath := ""
+	if c != nil && c.Request != nil && c.Request.URL != nil {
+		requestPath = c.Request.URL.Path
+	}
+	upstreamHost := ""
+	upstreamPath := ""
+	method := ""
+	if req != nil && req.URL != nil {
+		upstreamHost = req.URL.Host
+		upstreamPath = req.URL.Path
+		method = req.Method
+	}
+	requestID := ""
+	clientCFRay := ""
+	originator := ""
+	sessionID := ""
+	if c != nil && c.Request != nil {
+		requestID = c.GetString(common2.RequestIdKey)
+		clientCFRay = c.Request.Header.Get("CF-Ray")
+		originator = c.Request.Header.Get("originator")
+		sessionID = c.Request.Header.Get("session_id")
+	}
+	return fmt.Sprintf(
+		"stream upstream request start request_id=%s path=%s method=%s upstream_host=%s upstream_path=%s stream=%t channel_id=%d channel_type=%d retry_index=%d origin_model=%s upstream_model=%s proxy_enabled=%t client_cf_ray=%s originator=%s session_id=%s",
+		requestID,
+		requestPath,
+		method,
+		upstreamHost,
+		upstreamPath,
+		info != nil && info.IsStream,
+		getStreamChannelID(info),
+		getStreamChannelType(info),
+		getStreamRetryIndex(info),
+		getStreamOriginModel(info),
+		getStreamUpstreamModel(info),
+		info != nil && info.ChannelSetting.Proxy != "",
+		clientCFRay,
+		originator,
+		sessionID,
+	)
+}
+
+func buildStreamResponseLogDetails(resp *http.Response, elapsed time.Duration) string {
+	if resp == nil {
+		return fmt.Sprintf("elapsed=%s status=0 content_type= server= upstream_cf_ray=", elapsed.Round(time.Millisecond))
+	}
+	return fmt.Sprintf(
+		"elapsed=%s status=%d content_type=%s server=%s upstream_cf_ray=%s",
+		elapsed.Round(time.Millisecond),
+		resp.StatusCode,
+		resp.Header.Get("Content-Type"),
+		resp.Header.Get("Server"),
+		resp.Header.Get("CF-Ray"),
+	)
+}
+
+func getStreamChannelID(info *common.RelayInfo) int {
+	if info == nil || info.ChannelMeta == nil {
+		return 0
+	}
+	return info.ChannelId
+}
+
+func getStreamChannelType(info *common.RelayInfo) int {
+	if info == nil || info.ChannelMeta == nil {
+		return 0
+	}
+	return info.ChannelType
+}
+
+func getStreamRetryIndex(info *common.RelayInfo) int {
+	if info == nil {
+		return 0
+	}
+	return info.RetryIndex
+}
+
+func getStreamOriginModel(info *common.RelayInfo) string {
+	if info == nil {
+		return ""
+	}
+	return info.OriginModelName
+}
+
+func getStreamUpstreamModel(info *common.RelayInfo) string {
+	if info == nil {
+		return ""
+	}
+	return info.UpstreamModelName
+}
+
+func isDangerousStreamStatus(status int) bool {
+	return status == 524 || status >= http.StatusInternalServerError
+}
+
 func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http.Response, error) {
 	var client *http.Client
 	var err error
@@ -515,13 +612,28 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 		}
 	}
 
+	requestStart := time.Now()
+	if info.IsStream {
+		logger.LogWarn(c, buildStreamRequestLogDetails(c, req, info))
+	}
+
 	resp, err := client.Do(req)
 	if err != nil {
+		if info.IsStream {
+			logger.LogError(c, "stream upstream request failed "+buildStreamRequestLogDetails(c, req, info)+" "+fmt.Sprintf("elapsed=%s error=%v", time.Since(requestStart).Round(time.Millisecond), err))
+		}
 		logger.LogError(c, "do request failed: "+err.Error())
 		return nil, types.NewError(err, types.ErrorCodeDoRequestFailed, types.ErrOptionWithHideErrMsg("upstream error: do request failed"))
 	}
 	if resp == nil {
 		return nil, errors.New("resp is nil")
+	}
+	if info.IsStream {
+		responseDetails := buildStreamResponseLogDetails(resp, time.Since(requestStart))
+		logger.LogWarn(c, "stream upstream response headers received "+buildStreamRequestLogDetails(c, req, info)+" "+responseDetails)
+		if isDangerousStreamStatus(resp.StatusCode) {
+			logger.LogError(c, "dangerous stream upstream status detected "+buildStreamRequestLogDetails(c, req, info)+" "+responseDetails)
+		}
 	}
 
 	_ = req.Body.Close()

@@ -27,6 +27,37 @@ const (
 	DefaultPingInterval         = 10 * time.Second
 )
 
+func buildStreamLogDetails(c *gin.Context, info *relaycommon.RelayInfo) string {
+	path := ""
+	if c != nil && c.Request != nil && c.Request.URL != nil {
+		path = c.Request.URL.Path
+	}
+	if path == "" && info != nil {
+		path = info.RequestURLPath
+	}
+	if path == "" {
+		path = "unknown"
+	}
+
+	afterFirstChunk := false
+	received := 0
+	elapsed := 0 * time.Millisecond
+	frt := "n/a"
+
+	if info != nil {
+		afterFirstChunk = info.HasSendResponse()
+		received = info.ReceivedResponseCount
+		if !info.StartTime.IsZero() {
+			elapsed = time.Since(info.StartTime).Round(time.Millisecond)
+		}
+		if info.HasSendResponse() {
+			frt = info.FirstResponseTime.Sub(info.StartTime).Round(time.Millisecond).String()
+		}
+	}
+
+	return fmt.Sprintf("path=%s after_first_chunk=%t frt=%s elapsed=%s received=%d", path, afterFirstChunk, frt, elapsed, received)
+}
+
 func getScannerBufferSize() int {
 	if constant.StreamScannerMaxBufferMB > 0 {
 		return constant.StreamScannerMaxBufferMB << 20
@@ -292,8 +323,8 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 	}
 
 	if info.StreamStatus.IsNormalEnd() && !info.StreamStatus.HasErrors() {
-		logger.LogInfo(c, fmt.Sprintf("stream ended: %s", info.StreamStatus.Summary()))
+		logger.LogInfo(c, fmt.Sprintf("stream ended: %s %s", info.StreamStatus.Summary(), buildStreamLogDetails(c, info)))
 	} else {
-		logger.LogError(c, fmt.Sprintf("stream ended: %s, received=%d", info.StreamStatus.Summary(), info.ReceivedResponseCount))
+		logger.LogError(c, fmt.Sprintf("stream ended: %s %s", info.StreamStatus.Summary(), buildStreamLogDetails(c, info)))
 	}
 }
